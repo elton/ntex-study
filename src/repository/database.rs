@@ -17,6 +17,7 @@ pub fn new() -> DbPool {
         .expect("Failed to create pool.")
 }
 
+// create a new employee
 pub fn create_employee(
     pool: &mut PooledConnection<ConnectionManager<PgConnection>>,
     employee: NewEmployee,
@@ -26,4 +27,46 @@ pub fn create_employee(
     diesel::insert_into(employees)
         .values(&employee)
         .get_result(pool)
+}
+
+// get a employee by id
+pub fn get_employee_by_id(
+    pool: &mut PooledConnection<ConnectionManager<PgConnection>>,
+    employee_id: i32,
+) -> diesel::QueryResult<Employee> {
+    use crate::models::schema::employees::dsl::*;
+
+    employees.find(employee_id).first(pool)
+}
+
+// get all employees
+pub fn get_all_employees(
+    pool: &mut PooledConnection<ConnectionManager<PgConnection>>,
+) -> diesel::QueryResult<Vec<Employee>> {
+    use crate::models::schema::employees::dsl::*;
+
+    employees.load(pool)
+}
+
+// update a employee by id
+pub fn update_employee_by_id(
+    pool: &mut PooledConnection<ConnectionManager<PgConnection>>,
+    employee_id: i32,
+    employee: Employee,
+) -> diesel::QueryResult<Employee> {
+    use crate::models::schema::employees::dsl::*;
+
+    diesel::update(employees.find(employee_id))
+        .set(&employee)
+        .get_result(pool)
+}
+
+// delete a employee by id
+pub fn delete_employee_by_id(
+    pool: &mut PooledConnection<ConnectionManager<PgConnection>>,
+    employee_id: i32,
+) -> diesel::QueryResult<usize> {
+    use crate::models::schema::employees::dsl::*;
+
+    diesel::delete(employees.find(employee_id)).execute(pool)
 }

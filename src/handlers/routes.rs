@@ -8,7 +8,8 @@ use ntex::util::{Bytes, BytesMut};
 use ntex::web::{self, Error};
 use serde::{Deserialize, Serialize};
 
-use crate::models::employee::NewEmployee;
+use crate::models;
+use crate::models::employee::{Employee, NewEmployee};
 use crate::repository::database;
 
 pub type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
@@ -145,6 +146,74 @@ async fn create_employee(
     Ok(web::HttpResponse::Ok().json(&new_employee))
 }
 
+// get a employee by id
+#[web::get("/employee/{id}")]
+async fn get_employee(
+    pool: web::types::State<DbPool>,
+    id: web::types::Path<i32>,
+) -> Result<impl web::Responder, web::Error> {
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+    let employee = web::block(move || database::get_employee_by_id(&mut conn, id.into_inner()))
+        .await
+        .map_err(web::error::ErrorInternalServerError)?;
+
+    Ok(web::HttpResponse::Ok().json(&employee))
+}
+
+// get all employees
+#[web::get("/employees")]
+async fn get_employees(pool: web::types::State<DbPool>) -> Result<impl web::Responder, web::Error> {
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+    let employees = web::block(move || database::get_all_employees(&mut conn))
+        .await
+        .map_err(web::error::ErrorInternalServerError)?;
+
+    Ok(web::HttpResponse::Ok().json(&employees))
+}
+
+// update a employee by id
+#[web::put("/employee/{id}")]
+async fn update_employee(
+    pool: web::types::State<DbPool>,
+    id: web::types::Path<i32>,
+    employee: web::types::Json<NewEmployee>,
+) -> Result<impl web::Responder, web::Error> {
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+    let new_employee = models::employee::Employee {
+        id: id.clone(),
+        name: employee.name.clone(),
+        created_at: employee
+            .created_at
+            .unwrap_or(chrono::Local::now().naive_local()),
+    };
+
+    let employee = web::block(move || {
+        database::update_employee_by_id(&mut conn, id.into_inner(), new_employee)
+    })
+    .await
+    .map_err(web::error::ErrorInternalServerError)?;
+
+    Ok(web::HttpResponse::Ok().json(&employee))
+}
+
+// delete a employee by id
+#[web::delete("/employee/{id}")]
+async fn delete_employee(
+    pool: web::types::State<DbPool>,
+    id: web::types::Path<i32>,
+) -> Result<impl web::Responder, web::Error> {
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+    let res = web::block(move || database::delete_employee_by_id(&mut conn, id.into_inner()))
+        .await
+        .map_err(web::error::ErrorInternalServerError)?;
+
+    Ok(web::HttpResponse::Ok().json(&res))
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
@@ -187,6 +256,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 web::resource("/employee")
                     .name("employee")
                     .route(web::post().to(create_employee)),
-            ),
+            )
+            .service(get_employee)
+            .service(get_employees)
+            .service(update_employee)
+            .service(delete_employee),
     );
 }
