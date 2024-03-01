@@ -3,7 +3,6 @@ use diesel::prelude::*;
 use diesel::{self, r2d2::ConnectionManager};
 use futures::{future::ok, stream::once, StreamExt};
 use log::info;
-use ntex::service;
 use ntex::util::{Bytes, BytesMut};
 use ntex::web::{self, Error};
 use serde::{Deserialize, Serialize};
@@ -15,16 +14,16 @@ use crate::repository::database;
 pub type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Serialize)]
-pub struct Response {
+pub struct Response<T> {
     status: String,
     message: String,
-    data: Option<String>,
+    data: Option<T>,
 }
 
 /// health check
 #[web::get("/health")]
 async fn health() -> Result<web::HttpResponse, Error> {
-    Ok(web::HttpResponse::Ok().json(&Response {
+    Ok(web::HttpResponse::Ok().json(&Response::<()> {
         status: "success".to_string(),
         message: "Server is running".to_string(),
         data: None,
@@ -143,7 +142,11 @@ async fn create_employee(
     .await
     .map_err(web::error::ErrorInternalServerError)?;
 
-    Ok(web::HttpResponse::Ok().json(&new_employee))
+    Ok(web::HttpResponse::Ok().json(&Response::<&Employee> {
+        status: "success".to_string(),
+        message: "Created a employee data".to_string(),
+        data: Some(&new_employee),
+    }))
 }
 
 // get a employee by id
@@ -158,7 +161,11 @@ async fn get_employee(
         .await
         .map_err(web::error::ErrorInternalServerError)?;
 
-    Ok(web::HttpResponse::Ok().json(&employee))
+    Ok(web::HttpResponse::Ok().json(&Response::<&Employee> {
+        status: "success".to_string(),
+        message: "Get a employee data".to_string(),
+        data: Some(&employee),
+    }))
 }
 
 // get all employees
@@ -170,7 +177,11 @@ async fn get_employees(pool: web::types::State<DbPool>) -> Result<impl web::Resp
         .await
         .map_err(web::error::ErrorInternalServerError)?;
 
-    Ok(web::HttpResponse::Ok().json(&employees))
+    Ok(web::HttpResponse::Ok().json(&Response::<&Vec<Employee>> {
+        status: "success".to_string(),
+        message: "Get all employees data".to_string(),
+        data: Some(&employees),
+    }))
 }
 
 // update a employee by id
@@ -196,7 +207,11 @@ async fn update_employee(
     .await
     .map_err(web::error::ErrorInternalServerError)?;
 
-    Ok(web::HttpResponse::Ok().json(&employee))
+    Ok(web::HttpResponse::Ok().json(&Response::<&Employee> {
+        status: "success".to_string(),
+        message: "Updated a employee data".to_string(),
+        data: Some(&employee),
+    }))
 }
 
 // delete a employee by id
@@ -211,7 +226,11 @@ async fn delete_employee(
         .await
         .map_err(web::error::ErrorInternalServerError)?;
 
-    Ok(web::HttpResponse::Ok().json(&res))
+    Ok(web::HttpResponse::Ok().json(&Response::<String> {
+        status: "success".to_string(),
+        message: "Deleted a employee data".to_string(),
+        data: Some(format!("Deleted {} employee", res)),
+    }))
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
